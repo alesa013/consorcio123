@@ -1,0 +1,11 @@
+id,categoria,credito,prazo,parcela,nome
+1,Imóvel,80000,120,766.67,Imóvel Essencial 80 mil
+2,Imóvel,150000,180,958.33,Imóvel Família 150 mil
+3,Imóvel,250000,180,1597.22,Imóvel Conforto 250 mil
+4,Imóvel,400000,180,2555.56,Imóvel Premium 400 mil
+5,Veículo,30000,60,575.00,Veículo Compacto 30 mil
+6,Veículo,50000,80,718.75,Veículo Urbano 50 mil
+7,Veículo,80000,80,1150.00,Veículo Família 80 mil
+8,Veículo,120000,120,1150.00,Veículo Premium 120 mil
+9,Serviço,10000,36,319.44,Serviço Reforma Rápida 10 mil
+10,Serviço,25000,60,479.17,Serviço Reforma Completa 25 mil
