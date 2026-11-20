@@ -202,6 +202,42 @@ def listar_consorcios():
             conn,
         )
 
+def upsert_usuario(email, nome):
+    """Cria o usuario se o e-mail for novo; se ja existir, atualiza o nome.
+    Devolve o id do usuario."""
+    with _conexao() as conn:
+        conn.execute(
+            """INSERT INTO usuarios (email, nome, criado_em) VALUES (?, ?, ?)
+               ON CONFLICT(email) DO UPDATE SET nome = excluded.nome""",
+            (email, nome, _agora()),
+        )
+        return conn.execute(
+            "SELECT id FROM usuarios WHERE email = ?", (email,)
+        ).fetchone()[0]
+
+
+def salvar_perfil(usuario_id, perfil, decisao):
+    """Grava o perfil junto com a decisao. Devolve o id do perfil.
+    (Quem chama deve validar o perfil antes: erro de preenchimento nao grava.)"""
+    with _conexao() as conn:
+        return _inserir_perfil(conn, usuario_id, perfil, decisao)
+
+
+def ultimo_perfil(usuario_id):
+    """Devolve o perfil mais recente do usuario como dicionario,
+    ou None se ele nunca enviou um perfil."""
+    with _conexao() as conn:
+        cursor = conn.execute(
+            "SELECT * FROM perfis WHERE usuario_id = ? ORDER BY id DESC LIMIT 1",
+            (usuario_id,),
+        )
+        linha = cursor.fetchone()
+        if linha is None:
+            return None
+        nomes_das_colunas = [coluna[0] for coluna in cursor.description]
+    perfil = dict(zip(nomes_das_colunas, linha))
+    perfil["restricao"] = bool(perfil["restricao"])  # volta de 1/0 para True/False
+    return perfil
 
 # Roda so quando voce executa "python banco.py" (nao quando outro arquivo importa)
 if __name__ == "__main__":
