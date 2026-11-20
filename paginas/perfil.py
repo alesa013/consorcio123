@@ -5,6 +5,7 @@ import streamlit as st
 
 import banco
 import recomendador
+from formatacao import moeda, percentual, razao
 
 # Opções aceitas (contrato, seção 4; não mudar a grafia)
 VINCULOS = [
@@ -26,19 +27,6 @@ DECISAO_TESTE = {
     "motivo": "teste",
     "fatores": [],
 }
-
-
-def moeda(valor):
-    """Formata como moeda brasileira: 1234.5 -> R$ 1.234,50"""
-    texto = f"{valor:,.2f}"
-    texto = texto.replace(",", "X").replace(".", ",").replace("X", ".")
-    return f"R$ {texto}"
-
-
-def percentual(valor):
-    """0.324 -> 32,4%"""
-    return f"{valor * 100:.1f}%".replace(".", ",")
-
 
 def indice(opcoes, valor, padrao=0):
     """Posição de 'valor' na lista; se não estiver nela, usa a posição padrão."""
@@ -177,6 +165,6 @@ if enviado:
         c1.metric("Parcela estimada", moeda(ind["parcela_estimada"]))
         c2.metric("Comprometimento", percentual(ind["comprometimento"]))
         c3.metric("Entrada / crédito", percentual(ind["entrada_pct"]))
-        c4.metric("Crédito / renda anual", f"{ind['credito_renda']:.2f}".replace(".", ",") + "x")
+        c4.metric("Crédito / renda anual", razao(ind["credito_renda"]))
 
         st.info("A decisão e as recomendações aparecerão na página Resultado.")
