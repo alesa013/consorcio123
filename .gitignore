@@ -1,0 +1,9 @@
+# Ambiente e lixo do Python
+.venv/
+__pycache__/
+
+# Segredos e arquivos gerados em cada máquina (contrato, seção 3)
+.streamlit/secrets.toml
+consorcio.db
+*.joblib
+dados_treino.csv
