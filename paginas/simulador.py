@@ -2,6 +2,7 @@
 # Muda crédito, prazo, entrada e dívidas e mostra o efeito na hora.
 # Nada é gravado no banco; as contas e a decisão vêm das funções da Pessoa B.
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -170,7 +171,7 @@ if dec_cen:
         st.error("❌ Neste cenário o perfil seria recusado")
     st.write(f"**Motivo:** {dec_cen['motivo']}")
     if dec_cen.get("fatores"):
-               if dec_cen["origem"] == "Política":
+        if dec_cen["origem"] == "Política":
             st.write("**Motivos da recusa:**")
         else:
             st.write("**Fatores que mais pesam no modelo (valem para qualquer perfil):**")
@@ -185,18 +186,18 @@ if dec_cen:
 st.subheader("E se o prazo fosse outro?")
 linhas = []
 for p in PRAZOS:
-    alt = dict(cenario)
-    alt["prazo"] = p
-    if recomendador.validar_perfil(alt):
+    alt_perfil = dict(cenario)
+    alt_perfil["prazo"] = p
+    if recomendador.validar_perfil(alt_perfil):
         continue
-    ind = recomendador.calcular_indicadores(alt)
+    ind = recomendador.calcular_indicadores(alt_perfil)
     linha = {
         "Prazo (meses)": p,
         "Parcela": moeda(ind["parcela_estimada"]),
         "Comprometimento": percentual(ind["comprometimento"]),
     }
     if tem_decisao:
-        d = recomendador.decidir(alt)
+        d = recomendador.decidir(alt_perfil)
         linha["Probabilidade"] = percentual(d["probabilidade"])
         linha["Decisão"] = d["status"]
     linhas.append(linha)
