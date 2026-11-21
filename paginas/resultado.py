@@ -124,7 +124,10 @@ st.progress(min(max(float(decisao["probabilidade"]), 0.0), 1.0))
 st.write(f"**Motivo:** {decisao['motivo']}")
 
 if decisao.get("fatores"):
-    st.write("**Fatores que mais pesam no modelo (valem para qualquer perfil):**")
+    if decisao["origem"] == "Política":
+        st.write("**Motivos da recusa:**")
+    else:
+        st.write("**Fatores que mais pesam no modelo (valem para qualquer perfil):**")
     for fator in decisao["fatores"]:
         st.markdown(f"- {fator}")
 
