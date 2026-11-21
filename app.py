@@ -19,6 +19,7 @@ PAGINAS = [
     ("simulador.py", "Simulador", "🧮"),
     ("catalogo.py", "Catálogo", "📚"),
     ("acompanhamento.py", "Acompanhamento", "📊"),
+    ("conta.py", "Minha conta", "👤"),
 ]
 
 
