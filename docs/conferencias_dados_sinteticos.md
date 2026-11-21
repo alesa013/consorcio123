@@ -1,6 +1,6 @@
 # Conferências dos dados sintéticos
 
-Gerado em 20/11/2026.
+Gerado em 21/11/2026.
 
 Perfis gerados: 10000 (semente 42)
 - Recusados pela política: 40.7% (esperado 30% a 45%) -> OK

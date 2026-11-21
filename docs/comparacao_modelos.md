@@ -1,6 +1,6 @@
 # Comparação de modelos: árvore x regressão logística
 
-Gerado em 20/11/2026.
+Gerado em 21/11/2026.
 
 ## Todos os perfis do teste (2000 perfis)
 
