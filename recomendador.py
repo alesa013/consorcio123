@@ -107,3 +107,54 @@ def validar_perfil(perfil):
         erros.append("Restrição no nome: responda Sim ou Não.")
 
     return erros
+
+
+# ---------------------------------------------------------------------------
+# decidir() - decisão em duas camadas (contrato, seção 8)
+# Escrita pela Pessoa A, com a Pessoa B.
+# ---------------------------------------------------------------------------
+
+
+def _maiuscula(texto):
+    """Deixa a primeira letra maiúscula: 'há restrição' -> 'Há restrição'."""
+    return texto[0].upper() + texto[1:]
+
+
+def decidir(perfil):
+    """Devolve {"status", "probabilidade", "origem", "motivo", "fatores"}.
+
+    Camada 1 (política): recusa direto, sem consultar o modelo.
+    Camada 2 (modelo): nos demais casos, decide o avaliar_com_modelo().
+    Espera um perfil que já passou por validar_perfil().
+    """
+    ind = calcular_indicadores(perfil)
+
+    # --- Camada 1: política ---
+    motivos = []
+    if perfil["restricao"]:
+        motivos.append("há restrição no nome")
+    if perfil["renda"] < RENDA_MINIMA:
+        minimo = f"{RENDA_MINIMA:,.0f}".replace(",", ".")
+        motivos.append(f"a renda está abaixo do mínimo de R$ {minimo}")
+    if ind["comprometimento"] > LIMITE_COMPROMETIMENTO:
+        atual = f"{ind['comprometimento'] * 100:.1f}".replace(".", ",")
+        limite = f"{LIMITE_COMPROMETIMENTO * 100:.0f}"
+        motivos.append(
+            f"o comprometimento da renda ({atual}%) passa do limite de {limite}%"
+        )
+
+    if motivos:
+        return {
+            "status": "Recusado",
+            "probabilidade": 0.0,
+            "origem": "Política",
+            "motivo": "Recusado pela política: " + "; ".join(motivos) + ".",
+            "fatores": [_maiuscula(m) for m in motivos[:3]],
+        }
+
+    # --- Camada 2: modelo de IA ---
+    # O import fica aqui dentro (e não no topo) para evitar um "import circular":
+    # o modelo.py também importa o recomendador.py.
+    import modelo
+
+    return modelo.avaliar_com_modelo(perfil)
