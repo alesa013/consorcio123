@@ -8,6 +8,7 @@ import streamlit as st
 import banco
 import recomendador
 from formatacao import moeda, percentual
+import altair as alt
 
 PRAZOS = [36, 60, 80, 120, 180]
 CREDITO_MIN = 5000  # limites do contrato, seção 7
@@ -169,7 +170,10 @@ if dec_cen:
         st.error("❌ Neste cenário o perfil seria recusado")
     st.write(f"**Motivo:** {dec_cen['motivo']}")
     if dec_cen.get("fatores"):
-        st.write("**Fatores considerados:**")
+               if dec_cen["origem"] == "Política":
+            st.write("**Motivos da recusa:**")
+        else:
+            st.write("**Fatores que mais pesam no modelo (valem para qualquer perfil):**")
         for fator in dec_cen["fatores"]:
             st.markdown(f"- {fator}")
     if dec_cen["status"] == "Recusado" and hasattr(recomendador, "sugerir_ajustes"):
@@ -203,22 +207,35 @@ if tem_decisao:
     st.subheader("Probabilidade de aprovação conforme o crédito")
     st.caption("Mantém prazo, entrada (%) e dívidas do cenário e varia só o crédito.")
     pontos = []
-    for passo in range(11):
-        fator = 0.5 + 0.1 * passo  # de 50% a 150% do crédito simulado
+    for passo in range(16):
+        fator = 0.5 + 0.1 * passo  # de 50% a 200% do crédito simulado
         c = int(min(max(round(credito * fator, -3), CREDITO_MIN), CREDITO_MAX))
-        alt = dict(cenario)
-        alt["credito"] = float(c)
-        alt["entrada"] = round(c * entrada_pct / 100, 2)
-        if recomendador.validar_perfil(alt):
+        alt_perfil = dict(cenario)
+        alt_perfil["credito"] = float(c)
+        alt_perfil["entrada"] = round(c * entrada_pct / 100, 2)
+        if recomendador.validar_perfil(alt_perfil):
             continue
         pontos.append(
             {
-                "Crédito (R$ mil)": c / 1000,
-                "Probabilidade (%)": recomendador.decidir(alt)["probabilidade"] * 100,
+                "credito_mil": c / 1000,
+                "probabilidade": recomendador.decidir(alt_perfil)["probabilidade"] * 100,
             }
         )
     if len(pontos) >= 2:
-        dados = pd.DataFrame(pontos).drop_duplicates("Crédito (R$ mil)")
-        st.line_chart(dados.set_index("Crédito (R$ mil)"))
+        dados = pd.DataFrame(pontos).drop_duplicates("credito_mil")
+        grafico = (
+            alt.Chart(dados)
+            .mark_line(point=True)
+            .encode(
+                x=alt.X("credito_mil:Q", title="Crédito (R$ mil)"),
+                y=alt.Y(
+                    "probabilidade:Q",
+                    title="Probabilidade de aprovação (%)",
+                    scale=alt.Scale(domain=[0, 100]),
+                ),
+            )
+            .properties(height=300)
+        )
+        st.altair_chart(grafico)
     else:
         st.info("Não há pontos suficientes para desenhar o gráfico.")
