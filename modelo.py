@@ -1,9 +1,11 @@
 """
-modelo.py -  Alessandra
+modelo.py - Alessandra (contrato v3.2, secao 9)
 
-Parte 1: montar as entradas, treinar, salvar e carregar o modelo.
-Mais tarde entram: metricas(), avaliar_com_modelo() e a comparacao
-com a regressao logistica.
+Modelo de IA oficial: REGRESSAO LOGISTICA. A arvore de decisao da v3.1 ficou
+so para a comparacao (python modelo.py comparar).
+
+Funcoes do contrato: treinar_modelo(), carregar_modelo(),
+avaliar_com_modelo(perfil) e metricas().
 """
 import sys
 from datetime import date
@@ -25,19 +27,36 @@ from recomendador import calcular_indicadores
 
 # --- Caminhos (relativos a ESTE arquivo, como no banco.py) ---
 PASTA_RAIZ = Path(__file__).resolve().parent
-CAMINHO_MODELO = PASTA_RAIZ / "modelo.joblib"
+# NOVO v3.2: o nome do arquivo leva a versao do contrato. O modelo.joblib antigo
+# (arvore) nao serve mais; com outro nome, ele nunca e carregado por engano.
+CAMINHO_MODELO = PASTA_RAIZ / "modelo_v3_2.joblib"
 
 # --- Constantes do contrato (secao 9) ---
-MAX_DEPTH = 5
-MIN_SAMPLES_LEAF = 50
 FRACAO_TESTE = 0.20
 RANDOM_STATE = 42
+LIMIAR_APROVACAO = 0.5  # secao 8: Aprovado se probabilidade >= 0,5
+
+# Constantes da arvore da v3.1 (usadas so na comparacao)
+MAX_DEPTH = 5
+MIN_SAMPLES_LEAF = 50
 
 # Campos do perfil que entram no modelo (todos, exceto "objetivo")
-CAMPOS_DO_MODELO = ["renda", "vinculo", "tempo_vinculo", "dividas_mensais", "restricao", "entrada", "credito", "prazo"]
-LIMIAR_APROVACAO = 0.5  # contrato, secao 8: Aprovado se probabilidade >= 0,5
+CAMPOS_DO_MODELO = ["renda", "vinculo", "tempo_vinculo", "dividas_mensais",
+                    "restricao", "entrada", "credito", "prazo"]
+
+# Colunas numericas das entradas (tudo, menos "vinculo", que e texto)
+COLUNAS_NUMERICAS = ["renda", "tempo_vinculo", "dividas_mensais", "restricao",
+                     "entrada", "credito", "prazo", "parcela_estimada",
+                     "comprometimento", "entrada_pct", "credito_renda"]
+
+# NOVO v3.2: o modelo fica guardado aqui depois da primeira leitura, para nao
+# abrir o arquivo toda vez que decidir() for chamada (o Simulador chama ~20x).
+_modelo_em_memoria = None
 
 
+# ---------------------------------------------------------------------------
+# Entradas e divisao dos dados
+# ---------------------------------------------------------------------------
 def montar_entradas(dados):
     """Monta a tabela que o modelo recebe: os campos do perfil (sem objetivo)
     + os 4 indicadores. Aceita um DataFrame (muitos perfis) ou um
@@ -54,22 +73,6 @@ def montar_entradas(dados):
     return entradas
 
 
-def criar_pipeline():
-    """Cria a linha de montagem (ainda sem treinar):
-    estacao 1 = OneHotEncoder no vinculo (os outros campos passam direto)
-    estacao 2 = arvore de decisao."""
-    preparo = ColumnTransformer(
-        [("vinculo", OneHotEncoder(handle_unknown="ignore"), ["vinculo"])],
-        remainder="passthrough",
-    )
-    arvore = DecisionTreeClassifier(
-        max_depth=MAX_DEPTH,
-        min_samples_leaf=MIN_SAMPLES_LEAF,
-        random_state=RANDOM_STATE,
-    )
-    return Pipeline([("preparo", preparo), ("arvore", arvore)])
-
-
 def dividir_dados():
     """Gera os 10.000 perfis e separa 80% para treino e 20% para teste.
     Devolve: entradas_treino, entradas_teste, alvo_treino, alvo_teste."""
@@ -84,24 +87,69 @@ def dividir_dados():
     )
 
 
+# ---------------------------------------------------------------------------
+# Os dois modelos
+# ---------------------------------------------------------------------------
+def criar_pipeline_logistica():
+    """Modelo OFICIAL (v3.2). Linha de montagem ainda sem treinar:
+    estacao 1 = OneHotEncoder no vinculo + StandardScaler nos numeros
+    estacao 2 = regressao logistica."""
+    preparo = ColumnTransformer([
+        ("vinculo", OneHotEncoder(handle_unknown="ignore"), ["vinculo"]),
+        ("numeros", StandardScaler(), COLUNAS_NUMERICAS),
+    ])
+    regressao = LogisticRegression(max_iter=1000, random_state=RANDOM_STATE)
+    return Pipeline([("preparo", preparo), ("regressao", regressao)])
+
+
+def criar_pipeline_arvore():
+    """Arvore da v3.1. Fica so para a comparacao (python modelo.py comparar)."""
+    preparo = ColumnTransformer(
+        [("vinculo", OneHotEncoder(handle_unknown="ignore"), ["vinculo"])],
+        remainder="passthrough",
+    )
+    arvore = DecisionTreeClassifier(
+        max_depth=MAX_DEPTH,
+        min_samples_leaf=MIN_SAMPLES_LEAF,
+        random_state=RANDOM_STATE,
+    )
+    return Pipeline([("preparo", preparo), ("arvore", arvore)])
+
+
+# ---------------------------------------------------------------------------
+# Treinar e carregar (funcoes do contrato)
+# ---------------------------------------------------------------------------
 def treinar_modelo():
-    """Treina o modelo, salva em modelo.joblib e devolve as metricas
-    (o mesmo dicionario de metricas())."""
+    """Treina a regressao logistica, salva em modelo_v3_2.joblib, deixa o
+    modelo na memoria e devolve as metricas (o mesmo dicionario de metricas())."""
+    global _modelo_em_memoria  # "a variavel la de cima e a mesma: nao crie outra"
+
     entradas_treino, _, alvo_treino, _ = dividir_dados()
 
-    pipeline = criar_pipeline()
-    pipeline.fit(entradas_treino, alvo_treino)  # aqui a arvore "estuda"
+    pipeline = criar_pipeline_logistica()
+    pipeline.fit(entradas_treino, alvo_treino)  # aqui o modelo "estuda"
 
-    joblib.dump(pipeline, CAMINHO_MODELO)  # congela o modelo pronto
+    joblib.dump(pipeline, CAMINHO_MODELO)  # congela o modelo pronto no arquivo
+    _modelo_em_memoria = pipeline          # e ja deixa pronto na memoria
     return metricas()
 
 
 def carregar_modelo():
-    """Carrega o modelo salvo; se o arquivo nao existir, treina antes."""
-    if not CAMINHO_MODELO.exists():
-        treinar_modelo()
-    return joblib.load(CAMINHO_MODELO)
+    """Devolve o modelo. Ordem: 1) ja esta na memoria? usa; 2) existe o
+    arquivo? le e guarda na memoria; 3) senao, treina antes (contrato)."""
+    global _modelo_em_memoria
 
+    if _modelo_em_memoria is None:
+        if CAMINHO_MODELO.exists():
+            _modelo_em_memoria = joblib.load(CAMINHO_MODELO)
+        else:
+            treinar_modelo()  # ela mesma deixa o modelo na memoria
+    return _modelo_em_memoria
+
+
+# ---------------------------------------------------------------------------
+# Metricas
+# ---------------------------------------------------------------------------
 def _calcular_metricas(alvo_real, alvo_previsto):
     """Calcula as 4 medidas para um conjunto de perfis."""
     # labels=[0, 1] fixa a ordem: linha/coluna 0 = Recusado, 1 = Aprovado
@@ -116,38 +164,37 @@ def _calcular_metricas(alvo_real, alvo_previsto):
     }
 
 
-def metricas():
-    """Mede o modelo na 'prova' (os 2.000 perfis de teste) em dois recortes:
+def _avaliar_pipeline(pipeline, entradas_teste, alvo_teste):
+    """Mede um pipeline ja treinado nos dois recortes:
     1) todos os perfis do teste; 2) so os que a politica NAO recusa."""
-    modelo = carregar_modelo()
-    _, entradas_teste, _, alvo_teste = dividir_dados()
-    previsto = modelo.predict(entradas_teste)
+    previsto = pipeline.predict(entradas_teste)
 
-    # Recorte 2: reaproveita a regra da politica que ja existe no dados_sinteticos.py
-    # (a tabela de entradas tem as mesmas colunas que ela usa)
-    entradas_com_perfil = entradas_teste.copy()
-    entradas_com_perfil["restricao"] = entradas_com_perfil["restricao"].astype(bool)
-    faixa_intermediaria = ~recusado_pela_politica(entradas_com_perfil)
+    # Recorte 2: reaproveita a regra da politica do dados_sinteticos.py
+    com_booleano = entradas_teste.copy()
+    com_booleano["restricao"] = com_booleano["restricao"].astype(bool)
+    faixa = ~recusado_pela_politica(com_booleano)
 
     return {
         "todos": _calcular_metricas(alvo_teste, previsto),
         "faixa_intermediaria": _calcular_metricas(
-            alvo_teste[faixa_intermediaria], previsto[faixa_intermediaria.to_numpy()]
+            alvo_teste[faixa], previsto[faixa.to_numpy()]
         ),
     }
 
 
-def _fatores_do_modelo(modelo, quantos=3):
-    """Textos com as entradas que mais pesam no modelo (visao geral)."""
-    nomes = modelo.named_steps["preparo"].get_feature_names_out()
-    pesos = modelo.named_steps["arvore"].feature_importances_
-    ranking = sorted(zip(nomes, pesos), key=lambda par: par[1], reverse=True)
-    textos = []
-    for nome, peso in ranking[:quantos]:
-        if peso > 0:
-            nome_limpo = nome.split("__", 1)[-1]  # tira o prefixo "vinculo__"/"remainder__"
-            textos.append(f"{nome_limpo} (peso {peso:.0%} no modelo)")
-    return textos
+def metricas():
+    """Mede o modelo oficial na 'prova' (os 2.000 perfis de teste)."""
+    _, entradas_teste, _, alvo_teste = dividir_dados()
+    return _avaliar_pipeline(carregar_modelo(), entradas_teste, alvo_teste)
+
+
+# ---------------------------------------------------------------------------
+# Decisao do modelo (formato da secao 8)
+# ---------------------------------------------------------------------------
+def _fatores_do_modelo(modelo, entradas):
+    """PROVISORIO: a Tarefa 5 troca isto pelos fatores individuais.
+    Lista vazia = as paginas da Pessoa A simplesmente nao mostram fatores."""
+    return []
 
 
 def avaliar_com_modelo(perfil):
@@ -163,48 +210,19 @@ def avaliar_com_modelo(perfil):
         "origem": "Modelo",
         "motivo": ("O modelo estimou chance de aprovação de "
                    f"{probabilidade:.0%} para este perfil."),
-        "fatores": _fatores_do_modelo(modelo),
-    }
-# Colunas numericas das entradas (tudo, menos "vinculo", que e texto)
-COLUNAS_NUMERICAS = ["renda", "tempo_vinculo", "dividas_mensais", "restricao",
-                     "entrada", "credito", "prazo", "parcela_estimada",
-                     "comprometimento", "entrada_pct", "credito_renda"]
-
-
-def criar_pipeline_logistica():
-    """Linha de montagem da regressao logistica (so para a comparacao):
-    estacao 1 = OneHotEncoder no vinculo + StandardScaler nos numeros
-    estacao 2 = regressao logistica."""
-    preparo = ColumnTransformer([
-        ("vinculo", OneHotEncoder(handle_unknown="ignore"), ["vinculo"]),
-        ("numeros", StandardScaler(), COLUNAS_NUMERICAS),
-    ])
-    regressao = LogisticRegression(max_iter=1000, random_state=RANDOM_STATE)
-    return Pipeline([("preparo", preparo), ("regressao", regressao)])
-
-
-def _avaliar_pipeline(pipeline, entradas_teste, alvo_teste):
-    """Mede um pipeline ja treinado nos dois recortes (mesma regra da metricas())."""
-    previsto = pipeline.predict(entradas_teste)
-
-    com_booleano = entradas_teste.copy()
-    com_booleano["restricao"] = com_booleano["restricao"].astype(bool)
-    faixa = ~recusado_pela_politica(com_booleano)
-
-    return {
-        "todos": _calcular_metricas(alvo_teste, previsto),
-        "faixa_intermediaria": _calcular_metricas(
-            alvo_teste[faixa], previsto[faixa.to_numpy()]
-        ),
+        "fatores": _fatores_do_modelo(modelo, entradas),
     }
 
 
+# ---------------------------------------------------------------------------
+# Comparacao arvore x regressao logistica (python modelo.py comparar)
+# ---------------------------------------------------------------------------
 def comparar_com_regressao_logistica():
     """Treina arvore e regressao logistica (so na memoria, sem mexer no
-    modelo.joblib) com a MESMA divisao e devolve as metricas dos dois."""
+    arquivo do modelo) com a MESMA divisao e devolve as metricas dos dois."""
     entradas_treino, entradas_teste, alvo_treino, alvo_teste = dividir_dados()
 
-    arvore = criar_pipeline()
+    arvore = criar_pipeline_arvore()
     arvore.fit(entradas_treino, alvo_treino)
 
     logistica = criar_pipeline_logistica()
@@ -252,6 +270,7 @@ if __name__ == "__main__":
     if "comparar" in sys.argv:  # python modelo.py comparar
         imprimir_comparacao()
         sys.exit()  # para aqui: nao treina nem imprime o resto
+
     resultado = treinar_modelo()
     nomes = {"todos": "Todos os perfis do teste",
              "faixa_intermediaria": "So a faixa intermediaria (politica nao recusa)"}
