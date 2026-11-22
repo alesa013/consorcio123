@@ -174,7 +174,7 @@ if dec_cen:
         if dec_cen["origem"] == "Política":
             st.write("**Motivos da recusa:**")
         else:
-            st.write("**Fatores que mais pesam no modelo (valem para qualquer perfil):**")
+            st.write("**O que mais pesou no seu caso:**")
         for fator in dec_cen["fatores"]:
             st.markdown(f"- {fator}")
     if dec_cen["status"] == "Recusado" and hasattr(recomendador, "sugerir_ajustes"):

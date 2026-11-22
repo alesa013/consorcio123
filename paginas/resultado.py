@@ -127,7 +127,7 @@ if decisao.get("fatores"):
     if decisao["origem"] == "Política":
         st.write("**Motivos da recusa:**")
     else:
-        st.write("**Fatores que mais pesam no modelo (valem para qualquer perfil):**")
+        st.write("**O que mais pesou no seu caso:**")
     for fator in decisao["fatores"]:
         st.markdown(f"- {fator}")
 
@@ -173,4 +173,3 @@ else:
         if not st.session_state.get(chave):
             banco.salvar_recomendacoes(perfil_id, ranking)
             st.session_state[chave] = True
-        
