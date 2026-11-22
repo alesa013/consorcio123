@@ -12,6 +12,7 @@ from datetime import date
 from pathlib import Path
 
 import joblib
+import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
@@ -52,6 +53,21 @@ COLUNAS_NUMERICAS = ["renda", "tempo_vinculo", "dividas_mensais", "restricao",
 # NOVO v3.2: o modelo fica guardado aqui depois da primeira leitura, para nao
 # abrir o arquivo toda vez que decidir() for chamada (o Simulador chama ~20x).
 _modelo_em_memoria = None
+
+# NOVO (Tarefa 5): os fatores individuais comparam o perfil com um perfil
+# "tipico" entre os que o modelo avalia. Esse perfil tipico fica guardado aqui.
+_referencia_em_memoria = None
+
+# NOVO (Tarefa 5): os 4 temas dos fatores (os mesmos 4 pedacos da nota do contrato).
+# Colunas parecidas andam juntas, para o texto nao se repetir nem se contradizer.
+# ("restricao" nao entra: quem tem restricao nem chega ao modelo.)
+TEMAS_FATORES = {
+    "comprometimento": ["comprometimento", "dividas_mensais", "parcela_estimada", "prazo"],
+    "estabilidade": ["vinculo", "tempo_vinculo"],
+    "entrada": ["entrada", "entrada_pct"],
+    "credito_renda": ["credito_renda", "credito", "renda"],
+}
+LIMITE_FATOR = 0.05  # efeitos menores que isso sao ruido e nao viram fator
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +138,7 @@ def criar_pipeline_arvore():
 def treinar_modelo():
     """Treina a regressao logistica, salva em modelo_v3_2.joblib, deixa o
     modelo na memoria e devolve as metricas (o mesmo dicionario de metricas())."""
-    global _modelo_em_memoria  # "a variavel la de cima e a mesma: nao crie outra"
+    global _modelo_em_memoria, _referencia_em_memoria
 
     entradas_treino, _, alvo_treino, _ = dividir_dados()
 
@@ -131,6 +147,7 @@ def treinar_modelo():
 
     joblib.dump(pipeline, CAMINHO_MODELO)  # congela o modelo pronto no arquivo
     _modelo_em_memoria = pipeline          # e ja deixa pronto na memoria
+    _referencia_em_memoria = None          # o perfil tipico sera recalculado
     return metricas()
 
 
@@ -191,10 +208,81 @@ def metricas():
 # ---------------------------------------------------------------------------
 # Decisao do modelo (formato da secao 8)
 # ---------------------------------------------------------------------------
-def _fatores_do_modelo(modelo, entradas):
-    """PROVISORIO: a Tarefa 5 troca isto pelos fatores individuais.
-    Lista vazia = as paginas da Pessoa A simplesmente nao mostram fatores."""
-    return []
+def _pct(valor):
+    """0.324 -> '32,4%' """
+    return f"{valor * 100:.1f}%".replace(".", ",")
+
+
+def _transformar(modelo, entradas):
+    """Passa as entradas pela estacao 1 do pipeline e devolve uma tabela de numeros."""
+    x = modelo.named_steps["preparo"].transform(entradas)
+    return x.toarray() if hasattr(x, "toarray") else np.asarray(x)
+
+
+def _tema_da_coluna(nome_coluna):
+    """'numeros__entrada_pct' -> 'entrada'. Devolve None se a coluna nao tem tema."""
+    if nome_coluna.startswith("vinculo__"):
+        base = "vinculo"  # as 5 caixinhas do vinculo contam como uma coisa so
+    else:
+        base = nome_coluna.split("__", 1)[1]
+    for tema, colunas in TEMAS_FATORES.items():
+        if base in colunas:
+            return tema
+    return None
+
+
+def _carregar_referencia(modelo):
+    """Perfil 'tipico' entre os que o MODELO avalia (a politica nao recusa),
+    calculado uma vez com os dados de treino e guardado na memoria."""
+    global _referencia_em_memoria
+    if _referencia_em_memoria is None:
+        entradas_treino, _, _, _ = dividir_dados()
+        com_booleano = entradas_treino.copy()
+        com_booleano["restricao"] = com_booleano["restricao"].astype(bool)
+        avaliados = entradas_treino[~recusado_pela_politica(com_booleano)]
+        _referencia_em_memoria = _transformar(modelo, avaliados).mean(axis=0)
+    return _referencia_em_memoria
+
+
+def _descrever_tema(tema, linha):
+    """Texto simples, com os valores do proprio perfil e sem nomes de variavel."""
+    if tema == "comprometimento":
+        return f"Comprometimento da renda de {_pct(linha['comprometimento'])}"
+    if tema == "estabilidade":
+        meses = int(linha["tempo_vinculo"])
+        unidade = "mês" if meses == 1 else "meses"
+        return f"Vínculo {linha['vinculo']} há {meses} {unidade}"
+    if tema == "entrada":
+        return f"Entrada de {_pct(linha['entrada_pct'])} do crédito"
+    vezes = f"{linha['credito_renda']:.1f}".replace(".", ",")
+    return f"Crédito equivalente a {vezes}x a renda anual"
+
+
+def _fatores_do_modelo(modelo, entradas, quantos=3):
+    """Fatores INDIVIDUAIS: o que mais empurrou a chance deste perfil para cima
+    ou para baixo, em comparacao com o perfil tipico que o modelo avalia.
+    (efeito de cada coluna = peso x (valor do perfil - valor tipico))"""
+    x = _transformar(modelo, entradas)[0]
+    referencia = _carregar_referencia(modelo)
+    pesos = modelo.named_steps["regressao"].coef_[0]
+    nomes = modelo.named_steps["preparo"].get_feature_names_out()
+
+    # Soma o efeito das colunas de cada tema
+    efeito = {tema: 0.0 for tema in TEMAS_FATORES}
+    for nome, peso, valor, tipico in zip(nomes, pesos, x, referencia):
+        tema = _tema_da_coluna(nome)
+        if tema is not None:
+            efeito[tema] += peso * (valor - tipico)
+
+    # Os temas de maior efeito (positivo ou negativo) viram texto
+    linha = entradas.iloc[0]
+    textos = []
+    for tema, valor in sorted(efeito.items(), key=lambda par: abs(par[1]), reverse=True):
+        if abs(valor) < LIMITE_FATOR:
+            break  # os proximos sao ainda menores
+        sentido = "ajuda na aprovação" if valor > 0 else "pesa contra a aprovação"
+        textos.append(f"{_descrever_tema(tema, linha)}: {sentido}")
+    return textos[:quantos]
 
 
 def avaliar_com_modelo(perfil):
@@ -290,3 +378,6 @@ if __name__ == "__main__":
                "objetivo": "Imóvel", "credito": 200000.0, "prazo": 180}
     print("\nDecisao do perfil de exemplo:")
     print(avaliar_com_modelo(exemplo))
+    # O mesmo perfil sem entrada: os fatores precisam MUDAR (teste de aceite)
+    print("\nO mesmo perfil, sem entrada:")
+    print(avaliar_com_modelo({**exemplo, "entrada": 0.0}))
