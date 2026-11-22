@@ -8,12 +8,17 @@ BASE = {
 }
 
 casos = {
-    "1. Perfil comum (deve passar pelo modelo)": dict(BASE),
+    "1. Perfil de referência (na fronteira: pode sair Recusado)": dict(BASE),
     "2. Com restrição no nome": {**BASE, "restricao": True},
     "3. Renda baixa": {**BASE, "renda": 1200.0, "dividas_mensais": 0.0,
                        "credito": 20000.0, "entrada": 4000.0, "prazo": 60},
     "4. Comprometimento alto": {**BASE, "credito": 400000.0, "entrada": 0.0,
                                 "prazo": 36},
+    "5. Aprovado claro (perfil de demonstração)": {
+        "renda": 8000.0, "vinculo": "Servidor público", "tempo_vinculo": 96,
+        "dividas_mensais": 500.0, "restricao": False, "entrada": 40000.0,
+        "objetivo": "Imóvel", "credito": 200000.0, "prazo": 180,
+    },
 }
 
 for nome, perfil in casos.items():
