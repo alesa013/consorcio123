@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (accuracy_score, confusion_matrix,
+from sklearn.metrics import (accuracy_score, brier_score_loss, confusion_matrix,
                              precision_score, recall_score)
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
@@ -101,12 +101,17 @@ def dividir_dados():
         stratify=alvo,
         random_state=RANDOM_STATE,
     )
-
+def _fora_da_politica(entradas):
+    """Lista de True/False: True para os perfis que a politica NAO recusa
+    (os que o modelo de fato decide)."""
+    com_booleano = entradas.copy()
+    com_booleano["restricao"] = com_booleano["restricao"].astype(bool)
+    return (~recusado_pela_politica(com_booleano)).to_numpy()
 
 # ---------------------------------------------------------------------------
 # Os dois modelos
 # ---------------------------------------------------------------------------
-def criar_pipeline_logistica():
+def criar_pipeline_logistica(class_weight=None):
     """Modelo OFICIAL (v3.2). Linha de montagem ainda sem treinar:
     estacao 1 = OneHotEncoder no vinculo + StandardScaler nos numeros
     estacao 2 = regressao logistica."""
@@ -114,7 +119,7 @@ def criar_pipeline_logistica():
         ("vinculo", OneHotEncoder(handle_unknown="ignore"), ["vinculo"]),
         ("numeros", StandardScaler(), COLUNAS_NUMERICAS),
     ])
-    regressao = LogisticRegression(max_iter=1000, random_state=RANDOM_STATE)
+    regressao = LogisticRegression(max_iter=1000, random_state=RANDOM_STATE, class_weight=class_weight)
     return Pipeline([("preparo", preparo), ("regressao", regressao)])
 
 
@@ -142,8 +147,12 @@ def treinar_modelo():
 
     entradas_treino, _, alvo_treino, _ = dividir_dados()
 
+    # NOVO (experimento A): o modelo so estuda os perfis que ele vai decidir
+    # (a politica recusa os outros antes de o modelo ser consultado).
+    fora = _fora_da_politica(entradas_treino)
+
     pipeline = criar_pipeline_logistica()
-    pipeline.fit(entradas_treino, alvo_treino)  # aqui o modelo "estuda"
+    pipeline.fit(entradas_treino[fora], alvo_treino[fora])  # aqui o modelo "estuda"
 
     joblib.dump(pipeline, CAMINHO_MODELO)  # congela o modelo pronto no arquivo
     _modelo_em_memoria = pipeline          # e ja deixa pronto na memoria
@@ -321,6 +330,53 @@ def comparar_com_regressao_logistica():
         "logistica": _avaliar_pipeline(logistica, entradas_teste, alvo_teste),
     }
 
+# NOVO (Tarefa 6): os 2 experimentos do contrato v3.2
+EXPERIMENTOS = {
+    "Atual (treina com todos)": {"class_weight": None, "so_fora": False},
+    "A) só perfis fora da política": {"class_weight": None, "so_fora": True},
+    "B) class_weight balanced": {"class_weight": "balanced", "so_fora": False},
+    "A+B) os dois": {"class_weight": "balanced", "so_fora": True},
+}
+
+
+def comparar_experimentos():
+    """Treina as 4 variantes (so na memoria) e mede cada uma na faixa
+    intermediaria, que e onde o modelo de fato decide."""
+    entradas_treino, entradas_teste, alvo_treino, alvo_teste = dividir_dados()
+    treino_fora = _fora_da_politica(entradas_treino)
+    teste_fora = _fora_da_politica(entradas_teste)
+    x_teste = entradas_teste[teste_fora]
+    y_teste = alvo_teste[teste_fora]
+
+    resultados = {}
+    for nome, config in EXPERIMENTOS.items():
+        pipeline = criar_pipeline_logistica(class_weight=config["class_weight"])
+        if config["so_fora"]:
+            pipeline.fit(entradas_treino[treino_fora], alvo_treino[treino_fora])
+        else:
+            pipeline.fit(entradas_treino, alvo_treino)
+        medidas = _calcular_metricas(y_teste, pipeline.predict(x_teste))
+        # Brier: nota das chances previstas (menor = mais perto da realidade)
+        chances = pipeline.predict_proba(x_teste)[:, 1]
+        medidas["brier"] = float(brier_score_loss(y_teste, chances))
+        resultados[nome] = medidas
+    return resultados
+
+
+def _linhas_experimentos():
+    """Linhas de texto (markdown) com a tabela dos experimentos."""
+    resultados = comparar_experimentos()
+    linhas = ["## Experimentos do contrato v3.2 (faixa intermediária)", "",
+              "| Variante | Acurácia | Precisão | Revocação | Brier |",
+              "|---|---|---|---|---|"]
+    for nome, m in resultados.items():
+        linhas.append(f"| {nome} | {m['acuracia']:.1%} | {m['precisao']:.1%} | "
+                      f"{m['revocacao']:.1%} | {m['brier']:.3f} |")
+    linhas += ["", "Brier: quanto menor, mais perto da realidade ficaram as chances previstas.", ""]
+    for nome, m in resultados.items():
+        linhas.append(f"Matriz de {nome}: {m['matriz_confusao']}")
+    linhas.append("")
+    return linhas
 
 def imprimir_comparacao():
     """Mostra a comparacao na tela e registra em docs/comparacao_modelos.md."""
@@ -344,7 +400,8 @@ def imprimir_comparacao():
                    f"Matriz da logística: {lg['matriz_confusao']}",
                    f"Referência: chutar 'Aprovado' para todos acertaria {chute:.1%}.",
                    ""]
-
+        
+    linhas += _linhas_experimentos()  # NOVO (Tarefa 6)
     texto = "\n".join(linhas)
     print(texto)
 
