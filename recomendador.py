@@ -255,3 +255,116 @@ def ranquear(perfil, catalogo=None):
     ranking = pd.DataFrame(linhas, columns=COLUNAS_RANKING)
     # kind="stable": em caso de empate, mantem a ordem do catalogo
     return ranking.sort_values("score", ascending=False, kind="stable").reset_index(drop=True)
+
+# ---------------------------------------------------------------------------
+# Sugestoes de ajuste (secao 11)
+# ---------------------------------------------------------------------------
+def _aprovado(perfil):
+    """True se a decidir() aprova este perfil."""
+    return decidir(perfil)["status"] == "Aprovado"
+
+
+def _buscar_limite(aprovado, indice_atual, indice_extremo):
+    """Busca binaria: o 'jogo do mais alto / mais baixo'.
+    Os valores testados sao 'indice x passo'. O indice_atual e o lado que
+    recusa; o indice_extremo e o melhor caso possivel. Procura o valor
+    APROVADO mais perto do atual. Devolve o indice, ou None se nem o
+    melhor caso possivel e aprovado."""
+    if not aprovado(indice_extremo):
+        return None
+    ruim, bom = indice_atual, indice_extremo
+    while abs(ruim - bom) > 1:
+        meio = (ruim + bom) // 2
+        if aprovado(meio):
+            bom = meio   # aprovou: procura mais perto do valor atual
+        else:
+            ruim = meio  # recusou: precisa ir mais longe
+    return bom
+
+
+def _ajustes_numericos(perfil):
+    """Para cada 'alavanca', o valor mais proximo do atual que reverte a
+    recusa (cada uma testada SOZINHA, com o resto do perfil igual).
+    Devolve um dicionario so com as alavancas que funcionam."""
+    ajustes = {}
+
+    # 1) Credito menor (de 1.000 em 1.000; sempre maior que a entrada)
+    minimo = max(5000, (int(perfil["entrada"]) // 1000 + 1) * 1000)
+    atual_i = int(perfil["credito"] // 1000) + 1
+    extremo_i = minimo // 1000
+    if extremo_i < atual_i:
+        i = _buscar_limite(
+            lambda k: _aprovado({**perfil, "credito": k * 1000.0}), atual_i, extremo_i)
+        if i is not None:
+            ajustes["credito"] = i * 1000.0
+
+    # 2) Entrada maior (de 1.000 em 1.000; sempre menor que o credito)
+    atual_i = int(perfil["entrada"] // 1000)
+    extremo_i = int((perfil["credito"] - 1) // 1000)
+    if extremo_i > atual_i:
+        i = _buscar_limite(
+            lambda k: _aprovado({**perfil, "entrada": k * 1000.0}), atual_i, extremo_i)
+        if i is not None:
+            ajustes["entrada"] = i * 1000.0
+
+    # 3) Prazo maior: testa os prazos aceitos, do menor para o maior
+    for prazo in PRAZOS_ACEITOS:
+        if prazo > perfil["prazo"] and _aprovado({**perfil, "prazo": prazo}):
+            ajustes["prazo"] = prazo
+            break
+
+    # 4) Dividas menores (de 50 em 50 reais)
+    if perfil["dividas_mensais"] > 0:
+        atual_i = int(perfil["dividas_mensais"] // 50) + 1
+        i = _buscar_limite(
+            lambda k: _aprovado({**perfil, "dividas_mensais": k * 50.0}), atual_i, 0)
+        if i is not None:
+            ajustes["dividas_mensais"] = i * 50.0
+
+    return ajustes
+
+def sugerir_ajustes(perfil):
+    """Lista de textos: o que mudar para reverter uma recusa (secao 11).
+    Cada sugestao foi TESTADA com a decidir() e vale sozinha. Se o perfil ja e
+    aprovado, devolve lista vazia.
+    So chame depois de validar_perfil() devolver lista vazia."""
+    if _aprovado(perfil):
+        return []
+
+    sugestoes = []
+    base, final = perfil, ""
+
+    if perfil["restricao"]:
+        texto = ("Regularize a restrição no nome: enquanto ela existir, "
+                 "o pedido é recusado pela política.")
+        base = {**perfil, "restricao": False}
+        if _aprovado(base):
+            return [texto + " Com ela regularizada, o restante do perfil seria aprovado."]
+        sugestoes.append(texto)
+        final = ", depois de regularizar a restrição"
+
+    if base["renda"] < RENDA_MINIMA:
+        sugestoes.append(
+            f"A renda mensal informada ({_reais(base['renda'])}) está abaixo do mínimo "
+            f"de {_reais(RENDA_MINIMA)} exigido pela política, e nenhum dos outros "
+            "ajustes resolve isso sozinho.")
+        return sugestoes
+
+    ajustes = _ajustes_numericos(base)
+    if "credito" in ajustes:
+        sugestoes.append(f"Reduza o crédito desejado para até {_reais(ajustes['credito'])} "
+                         f"(hoje: {_reais(base['credito'])}){final}.")
+    if "entrada" in ajustes:
+        sugestoes.append(f"Aumente a entrada para pelo menos {_reais(ajustes['entrada'])} "
+                         f"(hoje: {_reais(base['entrada'])}){final}.")
+    if "prazo" in ajustes:
+        sugestoes.append(f"Aumente o prazo para {ajustes['prazo']} meses "
+                         f"(hoje: {base['prazo']}){final}.")
+    if "dividas_mensais" in ajustes:
+        sugestoes.append(f"Reduza as dívidas mensais para até {_reais(ajustes['dividas_mensais'])} "
+                         f"(hoje: {_reais(base['dividas_mensais'])}){final}.")
+
+    if not ajustes:
+        sugestoes.append("Nenhum ajuste isolado reverteu a recusa. Tente combinar mais de um, "
+                         "por exemplo reduzir o crédito e aumentar a entrada ao mesmo tempo.")
+    return sugestoes

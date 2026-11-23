@@ -98,4 +98,41 @@ vazio = ranquear(PERFIL_RANK, catalogo[catalogo["categoria"] != "Imóvel"])
 assert vazio.empty and list(vazio.columns) == COLUNAS_RANKING
 print("7) ranquear: justificativa e catalogo sem a categoria OK")
 
+# --- sugerir_ajustes (secao 11): usa a decidir() de verdade (precisa do modelo) ---
+from recomendador import _ajustes_numericos, decidir, sugerir_ajustes
+
+REF = {"renda": 4500.0, "vinculo": "CLT", "tempo_vinculo": 36,
+       "dividas_mensais": 500.0, "restricao": False, "entrada": 20000.0,
+       "objetivo": "Imóvel", "credito": 120000.0, "prazo": 120}
+APROVADO = {"renda": 8000.0, "vinculo": "Servidor público", "tempo_vinculo": 96,
+            "dividas_mensais": 500.0, "restricao": False, "entrada": 40000.0,
+            "objetivo": "Imóvel", "credito": 200000.0, "prazo": 180}
+
+# Perfil ja aprovado: nada a sugerir
+assert decidir(APROVADO)["status"] == "Aprovado"
+assert sugerir_ajustes(APROVADO) == []
+print("8) sugerir_ajustes: perfil aprovado nao recebe sugestoes OK")
+
+# So a restricao barra: a sugestao e regularizar
+so_restricao = dict(REF, restricao=True, credito=80000.0, entrada=30000.0, dividas_mensais=100.0)
+texto = sugerir_ajustes(so_restricao)
+assert len(texto) == 1 and "restrição" in texto[0] and "aprovado" in texto[0], texto
+# Renda abaixo do minimo: nenhum ajuste resolve, e o texto explica
+texto = sugerir_ajustes(dict(REF, renda=1200.0, dividas_mensais=0.0))
+assert len(texto) == 1 and "mínimo de R$ 1.500,00" in texto[0], texto
+print("9) sugerir_ajustes: restricao e renda abaixo do minimo OK")
+
+# Perfil recusado pelo MODELO: toda sugestao tem que aprovar de verdade
+assert decidir(REF)["status"] == "Recusado", "o perfil de referencia deveria ser recusado"
+ajustes = _ajustes_numericos(REF)
+assert ajustes, "deveria haver pelo menos um ajuste"
+for campo, valor in ajustes.items():
+    assert decidir(dict(REF, **{campo: valor}))["status"] == "Aprovado", (campo, valor)
+assert len(sugerir_ajustes(REF)) == len(ajustes)       # um texto por ajuste
+# O credito sugerido e o MAIOR (mais perto do pedido) que aprova: 1.000 a mais recusa
+if "credito" in ajustes:
+    assert ajustes["credito"] < REF["credito"]
+    assert decidir(dict(REF, credito=ajustes["credito"] + 1000))["status"] == "Recusado"
+print("10) sugerir_ajustes: toda sugestao foi testada e aprova OK:", ajustes)
+
 print("TUDO CERTO")
