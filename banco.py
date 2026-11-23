@@ -314,7 +314,78 @@ def resumo_dashboard():
         "probabilidade_media": float(media),
         "por_objetivo": por_objetivo,
     }
+# ---------------------------------------------------------------------------
+# CRUD do catalogo (contrato, secao 11) - escrito pela Pessoa A
+# ---------------------------------------------------------------------------
+def _validar_consorcio(dados):
+    """Confere os dados de um consorcio. Devolve (categoria, credito, prazo, nome)
+    ou levanta ValueError se algo estiver errado."""
+    categoria = dados.get("categoria")
+    if categoria not in OBJETIVOS:
+        raise ValueError(f"Categoria inválida: {categoria!r}")
+    credito = float(dados.get("credito", 0))
+    if credito <= 0:
+        raise ValueError("O crédito deve ser maior que zero.")
+    prazo = int(dados.get("prazo", 0))
+    if prazo <= 0:
+        raise ValueError("O prazo deve ser maior que zero.")
+    nome = str(dados.get("nome", "")).strip()
+    if not nome:
+        raise ValueError("Informe o nome do consórcio.")
+    return categoria, credito, prazo, nome
 
+
+def _calcular_parcela(credito, prazo):
+    """Parcela do catalogo = credito * (1 + TAXA_ADMIN) / prazo (contrato, secao 13).
+    O import fica aqui dentro (e nao no topo) para evitar import circular
+    com o recomendador.py."""
+    from recomendador import TAXA_ADMIN
+    return round(credito * (1 + TAXA_ADMIN) / prazo, 2)
+
+
+def criar_consorcio(dados):
+    """Cria um consorcio. 'dados' tem categoria, credito, prazo e nome;
+    a parcela e calculada aqui. Devolve o id do novo consorcio."""
+    categoria, credito, prazo, nome = _validar_consorcio(dados)
+    parcela = _calcular_parcela(credito, prazo)
+    with _conexao() as conn:
+        cursor = conn.execute(
+            """INSERT INTO consorcios (categoria, credito, prazo, parcela, nome)
+               VALUES (?, ?, ?, ?, ?)""",
+            (categoria, credito, prazo, parcela, nome),
+        )
+        return cursor.lastrowid
+
+
+def editar_consorcio(consorcio_id, dados):
+    """Atualiza um consorcio (a parcela e recalculada). Devolve quantas
+    linhas mudou: 1 se achou o consorcio, 0 se o id nao existe."""
+    categoria, credito, prazo, nome = _validar_consorcio(dados)
+    parcela = _calcular_parcela(credito, prazo)
+    with _conexao() as conn:
+        cursor = conn.execute(
+            """UPDATE consorcios
+               SET categoria = ?, credito = ?, prazo = ?, parcela = ?, nome = ?
+               WHERE id = ?""",
+            (categoria, credito, prazo, parcela, nome, int(consorcio_id)),
+        )
+        return cursor.rowcount
+
+
+def excluir_consorcio(consorcio_id):
+    """Apaga um consorcio. As recomendacoes antigas que apontam para ele
+    tambem sao apagadas (senao o banco recusa a exclusao). Tudo ou nada.
+    Devolve quantas linhas saiu de cada tabela."""
+    with _conexao() as conn:
+        recomendacoes = conn.execute(
+            "DELETE FROM recomendacoes WHERE consorcio_id = ?", (int(consorcio_id),)
+        ).rowcount
+        consorcios = conn.execute(
+            "DELETE FROM consorcios WHERE id = ?", (int(consorcio_id),)
+        ).rowcount
+    return {"recomendacoes": recomendacoes, "consorcios": consorcios}
+
+    
 # Roda so quando voce executa "python banco.py" (nao quando outro arquivo importa)
 if __name__ == "__main__":
     iniciar_banco()
