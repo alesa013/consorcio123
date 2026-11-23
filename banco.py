@@ -19,6 +19,9 @@ CAMINHO_CSV = PASTA_RAIZ / "consorcios.csv"
 # Colunas do catalogo, na ordem do contrato (secao 13)
 COLUNAS_CATALOGO = ["id", "categoria", "credito", "prazo", "parcela", "nome"]
 
+# As 3 categorias de objetivo (contrato, secao 4), usadas no resumo do dashboard
+OBJETIVOS = ["Imóvel", "Veículo", "Serviço"]
+
 # --- As 4 tabelas (secao 12). IF NOT EXISTS = so cria se ainda nao existir ---
 SQL_CRIAR_TABELAS = """
 CREATE TABLE IF NOT EXISTS usuarios (
@@ -262,7 +265,6 @@ def salvar_recomendacoes(perfil_id, df):
         )
     return len(linhas)
 
-
 def excluir_dados_usuario(usuario_id):
     """Apaga os dados de UM usuario, nesta ordem: 1) as recomendacoes dos
     perfis dele, 2) os perfis, 3) o usuario. Tudo ou nada: se algo falhar,
@@ -280,6 +282,38 @@ def excluir_dados_usuario(usuario_id):
             "DELETE FROM usuarios WHERE id = ?", (usuario_id,)
         ).rowcount
     return {"recomendacoes": recomendacoes, "perfis": perfis, "usuarios": usuarios}
+
+def resumo_dashboard():
+    """Agregados para o dashboard, SEM dados individuais (nada de e-mail, nome
+    ou renda de ninguem). A taxa e a probabilidade media consideram TODOS os
+    perfis gravados (inclusive os de demonstracao); sem perfis, tudo vale 0."""
+    with _conexao() as conn:
+        total_perfis, aprovados, media = conn.execute(
+            """SELECT COUNT(*),
+                      COALESCE(SUM(status = 'Aprovado'), 0),
+                      COALESCE(AVG(probabilidade), 0)
+               FROM perfis"""
+        ).fetchone()
+        total_usuarios = _contar(conn, "usuarios")
+        linhas = conn.execute(
+            """SELECT objetivo, COUNT(*), COALESCE(SUM(status = 'Aprovado'), 0)
+               FROM perfis GROUP BY objetivo"""
+        ).fetchall()
+
+    # Os 3 objetivos sempre aparecem, mesmo que ninguem tenha escolhido um deles
+    por_objetivo = {nome: {"total": 0, "aprovados": 0} for nome in OBJETIVOS}
+    for objetivo, total, aprovados_do_objetivo in linhas:
+        if objetivo in por_objetivo:
+            por_objetivo[objetivo] = {"total": int(total),
+                                      "aprovados": int(aprovados_do_objetivo)}
+
+    return {
+        "total_perfis": int(total_perfis),
+        "total_usuarios": int(total_usuarios),
+        "taxa_aprovacao": aprovados / total_perfis if total_perfis else 0.0,
+        "probabilidade_media": float(media),
+        "por_objetivo": por_objetivo,
+    }
 
 # Roda so quando voce executa "python banco.py" (nao quando outro arquivo importa)
 if __name__ == "__main__":

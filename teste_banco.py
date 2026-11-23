@@ -83,5 +83,32 @@ with tempfile.TemporaryDirectory() as pasta:
     zeros = {"recomendacoes": 0, "perfis": 0, "usuarios": 0}
     assert banco.excluir_dados_usuario(9999) == zeros          # usuario inexistente: nada acontece
     print("7) excluir_dados_usuario OK")
+    
+    # 8) resumo_dashboard: so agregados (usa um banco novo, sem perfis de demonstracao)
+    banco.CAMINHO_BANCO = Path(pasta) / "resumo.db"
+    with banco._conexao() as conn:
+        conn.executescript(banco.SQL_CRIAR_TABELAS)
+    vazios = {"total": 0, "aprovados": 0}
+    esperado_vazio = {"total_perfis": 0, "total_usuarios": 0, "taxa_aprovacao": 0.0,
+                      "probabilidade_media": 0.0,
+                      "por_objetivo": {"Imóvel": vazios, "Veículo": vazios, "Serviço": vazios}}
+    assert banco.resumo_dashboard() == esperado_vazio, banco.resumo_dashboard()
+
+    u = banco.upsert_usuario("x@exemplo.com", "X")
+    banco.salvar_perfil(u, dict(PERFIL, objetivo="Imóvel"),
+                        dict(DECISAO, status="Aprovado", probabilidade=0.9))
+    banco.salvar_perfil(u, dict(PERFIL, objetivo="Imóvel"),
+                        dict(DECISAO, status="Recusado", probabilidade=0.0))
+    banco.salvar_perfil(u, dict(PERFIL, objetivo="Serviço"),
+                        dict(DECISAO, status="Aprovado", probabilidade=0.7))
+    r = banco.resumo_dashboard()
+    assert r["total_perfis"] == 3 and r["total_usuarios"] == 1
+    assert abs(r["taxa_aprovacao"] - 2 / 3) < 1e-9
+    assert abs(r["probabilidade_media"] - (0.9 + 0.0 + 0.7) / 3) < 1e-9
+    assert r["por_objetivo"] == {"Imóvel": {"total": 2, "aprovados": 1},
+                                 "Veículo": {"total": 0, "aprovados": 0},
+                                 "Serviço": {"total": 1, "aprovados": 1}}, r
+    assert "x@exemplo.com" not in str(r)       # nada individual no resultado
+    print("8) resumo_dashboard OK")
 
 print("TUDO CERTO")
