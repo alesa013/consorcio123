@@ -5,6 +5,8 @@ Parte 1: constantes, indicadores e validacao do perfil.
 Mais tarde entram: decidir(), ranquear() e sugerir_ajustes().
 """
 
+import pandas as pd
+
 # --- Constantes do contrato (secao 6) ---
 RENDA_MINIMA = 1500
 LIMITE_COMPROMETIMENTO = 0.40
@@ -13,6 +15,14 @@ NOTA_MINIMA = 60
 ENTRADA_REF = 0.20
 LIMITE_CREDITO_RENDA = 6
 TAXA_ADMIN = 0.15  # ficticia
+
+# --- Constantes do ranking (secao 10) ---
+# O contrato diz que a nota da parcela "diminui proporcionalmente ate 0", mas nao
+# diz onde chega a 0. Interpretacao adotada: chega a 0 quando o comprometimento
+# alcanca o DOBRO do limite (80%). Para mudar a regra, mude so esta linha.
+COMPROMETIMENTO_NOTA_ZERO = 2 * LIMITE_COMPROMETIMENTO
+COLUNAS_RANKING = ["id", "categoria", "credito", "prazo", "parcela", "nome",
+                   "score", "justificativa"]
 
 # --- Listas aceitas (secao 4) ---
 VINCULOS = ["CLT", "Servidor público", "Autônomo/MEI", "Empresário",
@@ -158,3 +168,90 @@ def decidir(perfil):
     import modelo
 
     return modelo.avaliar_com_modelo(perfil)
+
+# ---------------------------------------------------------------------------
+# Ranking do catalogo (secao 10)
+# ---------------------------------------------------------------------------
+def _percentual(valor):
+    """0.324 -> '32,4%' (formato brasileiro)."""
+    return f"{valor * 100:.1f}%".replace(".", ",")
+
+
+def _nota_credito(credito_catalogo, credito):
+    """0 a 50: quanto mais perto do credito desejado, melhor."""
+    return 50 * max(0, 1 - abs(credito_catalogo - credito) / credito)
+
+
+def _nota_prazo(prazo_catalogo, prazo):
+    """0 a 25: 25 se o prazo e igual; senao perde pontos com a diferenca."""
+    if prazo_catalogo == prazo:
+        return 25
+    return 25 * max(0, 1 - abs(prazo_catalogo - prazo) / prazo)
+
+
+def _nota_parcela(comprometimento):
+    """0 a 25: 25 se a parcela cabe no limite; acima dele, a nota cai em linha
+    reta e chega a 0 em COMPROMETIMENTO_NOTA_ZERO."""
+    if comprometimento <= LIMITE_COMPROMETIMENTO:
+        return 25
+    excesso = ((comprometimento - LIMITE_COMPROMETIMENTO)
+               / (COMPROMETIMENTO_NOTA_ZERO - LIMITE_COMPROMETIMENTO))
+    return 25 * max(0, 1 - excesso)
+
+
+def _justificativa(consorcio, perfil, comprometimento):
+    """Texto simples explicando por que este consorcio recebeu esta nota."""
+    pedido = perfil["credito"]
+    if consorcio["credito"] == pedido:
+        credito = "crédito igual ao desejado"
+    else:
+        diferenca = abs(consorcio["credito"] - pedido) / pedido
+        sentido = "acima" if consorcio["credito"] > pedido else "abaixo"
+        credito = (f"crédito de {_reais(consorcio['credito'])}, "
+                   f"{_percentual(diferenca)} {sentido} do desejado")
+
+    prazo = int(consorcio["prazo"])
+    if prazo == perfil["prazo"]:
+        texto_prazo = f"prazo de {prazo} meses, igual ao desejado"
+    else:
+        texto_prazo = f"prazo de {prazo} meses (você pediu {perfil['prazo']})"
+
+    limite = f"{LIMITE_COMPROMETIMENTO * 100:.0f}%"
+    situacao = "dentro" if comprometimento <= LIMITE_COMPROMETIMENTO else "acima"
+    parcela = (f"parcela de {_reais(consorcio['parcela'])} leva o comprometimento "
+               f"da renda a {_percentual(comprometimento)} ({situacao} do limite de {limite})")
+
+    return f"Este consórcio tem {credito}; {texto_prazo}; {parcela}."
+
+
+def ranquear(perfil, catalogo=None):
+    """Ranking do catalogo para o perfil (secao 10). So consorcios da categoria
+    igual ao objetivo, com score de 0 a 100, do melhor para o pior.
+    Devolve um DataFrame com as colunas de COLUNAS_RANKING (vazio se nenhum
+    consorcio combinar). 'catalogo' e opcional: sem ele, le do banco.
+    So chame depois de validar_perfil() devolver lista vazia."""
+    if catalogo is None:
+        import banco  # dentro da funcao: este arquivo nao depende do banco para o resto
+        catalogo = banco.listar_consorcios()
+
+    candidatos = catalogo[catalogo["categoria"] == perfil["objetivo"]]
+    if candidatos.empty:
+        return pd.DataFrame(columns=COLUNAS_RANKING)
+
+    linhas = []
+    for _, c in candidatos.iterrows():
+        comprometimento = (perfil["dividas_mensais"] + c["parcela"]) / perfil["renda"]
+        score = (_nota_credito(c["credito"], perfil["credito"])
+                 + _nota_prazo(c["prazo"], perfil["prazo"])
+                 + _nota_parcela(comprometimento))
+        linhas.append({
+            "id": int(c["id"]), "categoria": c["categoria"],
+            "credito": float(c["credito"]), "prazo": int(c["prazo"]),
+            "parcela": float(c["parcela"]), "nome": c["nome"],
+            "score": round(float(score), 1),
+            "justificativa": _justificativa(c, perfil, comprometimento),
+        })
+
+    ranking = pd.DataFrame(linhas, columns=COLUNAS_RANKING)
+    # kind="stable": em caso de empate, mantem a ordem do catalogo
+    return ranking.sort_values("score", ascending=False, kind="stable").reset_index(drop=True)
