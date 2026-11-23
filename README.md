@@ -156,8 +156,8 @@ Preencha na página **Meu perfil** e clique em **Avaliar perfil**:
 | 3 | igual ao perfil 1 | | | | **Sim** | | | | | **Recusado pela política** (restrição no nome) |
 | 4 | 1.200 | CLT | 36 | 0 | Não | 4.000 | Imóvel | 20.000 | 60 | **Recusado pela política** (renda abaixo do mínimo) |
 | 5 | 4.500 | CLT | 36 | 500 | Não | 0 | Imóvel | 400.000 | 36 | **Recusado pela política** (comprometimento de 295,1%) |
-
-_(A preencher na rodada de testes: um perfil de **Veículo** e um de **Serviço**.)_
+| 6 | 6.000 | Servidor público | 60 | 400 | Não | 20.000 | Veículo | 80.000 | 60 | **Aprovado**, cerca de 95%, com recomendações de Veículo |
+| 7 | 5.000 | CLT | 48 | 300 | Não | 5.000 | Serviço | 20.000 | 36 | **Aprovado**, cerca de 99,5%, com recomendações de Serviço |
 
 **Sugestão de roteiro:**
 
