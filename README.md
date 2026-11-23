@@ -236,5 +236,5 @@ Veja a pasta `docs/` para o contrato técnico entre as partes do projeto, a comp
 
 ## Equipe
 
-- **Pessoa A:** interface (páginas Streamlit), login Microsoft e integração com o banco e o modelo.
-- **Pessoa B:** dados, banco SQLite, geração dos perfis sintéticos, modelo de IA e regras de recomendação.
+- **Esther:** interface (páginas Streamlit), login Microsoft e integração com o banco e o modelo.
+- **Alessandra:** dados, banco SQLite, geração dos perfis sintéticos, modelo de IA e regras de recomendação.
