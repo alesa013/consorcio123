@@ -41,8 +41,8 @@ Ordem dos campos: renda / vínculo / meses de vínculo / dívidas / restrição 
 | **P3** (restrição) | P1 com restrição **Sim** | Recusado pela política, 0% |
 | **P4** (renda baixa) | 1200 / CLT / 36 / 0 / Não / 4000 / Imóvel / 20000 / 60 | Recusado pela política (renda abaixo de R$ 1.500) |
 | **P5** (comprometimento alto) | 4500 / CLT / 36 / 500 / Não / 0 / Imóvel / 400000 / 36 | Recusado pela política (comprometimento de 295,1%) |
-| **P6** (Veículo) | 6000 / Servidor público / 60 / 400 / Não / 20000 / Veículo / 80000 / 60 | Aprovado (a confirmar na primeira rodada) |
-| **P7** (Serviço) | 5000 / CLT / 48 / 300 / Não / 5000 / Serviço / 20000 / 36 | Aprovado (a confirmar na primeira rodada) |
+| **P6** (Veículo) | 6000 / Servidor público / 60 / 400 / Não / 20000 / Veículo / 80000 / 60 | Aprovado, cerca de 95%, origem Modelo |
+| **P7** (Serviço) | 5000 / CLT / 48 / 300 / Não / 5000 / Serviço / 20000 / 36 | Aprovado, cerca de 99,5%, origem Modelo |
 
 ## 6. Casos de teste
 
