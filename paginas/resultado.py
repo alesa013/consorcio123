@@ -151,7 +151,7 @@ if not aprovado:
             "As sugestões aparecerão quando a função sugerir_ajustes() "
             "da Pessoa B ficar pronta."
         )
-    st.caption("Na página Simulador você poderá testar essas mudanças.")
+    st.caption("Cada sugestão vale sozinha, a menos que o texto diga o contrário. Teste as mudanças na página Simulador.")
     st.stop()
 
 # ----- Aprovado: recomendações -----

@@ -178,7 +178,7 @@ if dec_cen:
         for fator in dec_cen["fatores"]:
             st.markdown(f"- {fator}")
     if dec_cen["status"] == "Recusado" and hasattr(recomendador, "sugerir_ajustes"):
-        st.write("**O que tentar para reverter:**")
+        st.write("**O que tentar para reverter (cada sugestão vale sozinha, salvo indicação em contrário):**")
         for sugestao in recomendador.sugerir_ajustes(cenario):
             st.markdown(f"- {sugestao}")
 
