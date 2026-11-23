@@ -239,6 +239,48 @@ def ultimo_perfil(usuario_id):
     perfil["restricao"] = bool(perfil["restricao"])  # volta de 1/0 para True/False
     return perfil
 
+def salvar_recomendacoes(perfil_id, df):
+    """Grava o ranking (o DataFrame do ranquear) na tabela recomendacoes.
+    Chamar duas vezes para o mesmo perfil NAO duplica: o ranking antigo
+    daquele perfil e trocado pelo novo. Devolve quantas linhas gravou."""
+    if df is None or df.empty:
+        return 0  # nada para gravar: nao mexe em nada
+
+    agora = _agora()
+    linhas = [
+        (perfil_id, int(linha["id"]), float(linha["score"]),
+         str(linha["justificativa"]), agora)
+        for _, linha in df.iterrows()
+    ]
+    with _conexao() as conn:
+        conn.execute("DELETE FROM recomendacoes WHERE perfil_id = ?", (perfil_id,))
+        conn.executemany(
+            """INSERT INTO recomendacoes
+               (perfil_id, consorcio_id, score, justificativa, criado_em)
+               VALUES (?, ?, ?, ?, ?)""",
+            linhas,
+        )
+    return len(linhas)
+
+
+def excluir_dados_usuario(usuario_id):
+    """Apaga os dados de UM usuario, nesta ordem: 1) as recomendacoes dos
+    perfis dele, 2) os perfis, 3) o usuario. Tudo ou nada: se algo falhar,
+    nada e apagado. Devolve quantas linhas saiu de cada tabela."""
+    with _conexao() as conn:
+        recomendacoes = conn.execute(
+            """DELETE FROM recomendacoes
+               WHERE perfil_id IN (SELECT id FROM perfis WHERE usuario_id = ?)""",
+            (usuario_id,),
+        ).rowcount
+        perfis = conn.execute(
+            "DELETE FROM perfis WHERE usuario_id = ?", (usuario_id,)
+        ).rowcount
+        usuarios = conn.execute(
+            "DELETE FROM usuarios WHERE id = ?", (usuario_id,)
+        ).rowcount
+    return {"recomendacoes": recomendacoes, "perfis": perfis, "usuarios": usuarios}
+
 # Roda so quando voce executa "python banco.py" (nao quando outro arquivo importa)
 if __name__ == "__main__":
     iniciar_banco()
