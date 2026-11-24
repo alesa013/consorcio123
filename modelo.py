@@ -101,6 +101,7 @@ def dividir_dados():
         stratify=alvo,
         random_state=RANDOM_STATE,
     )
+
 def _fora_da_politica(entradas):
     """Lista de True/False: True para os perfis que a politica NAO recusa
     (os que o modelo de fato decide)."""
@@ -191,8 +192,11 @@ def _calcular_metricas(alvo_real, alvo_previsto):
 
 
 def _avaliar_pipeline(pipeline, entradas_teste, alvo_teste):
-    """Mede um pipeline ja treinado nos dois recortes:
-    1) todos os perfis do teste; 2) so os que a politica NAO recusa."""
+    """Mede um pipeline ja treinado em tres recortes:
+    1) todos os perfis do teste (so o modelo);
+    2) so os que a politica NAO recusa (so o modelo);
+    3) sistema completo: a politica recusa primeiro e o modelo
+       decide os demais (e o que o usuario realmente ve)."""
     previsto = pipeline.predict(entradas_teste)
 
     # Recorte 2: reaproveita a regra da politica do dados_sinteticos.py
@@ -200,11 +204,16 @@ def _avaliar_pipeline(pipeline, entradas_teste, alvo_teste):
     com_booleano["restricao"] = com_booleano["restricao"].astype(bool)
     faixa = ~recusado_pela_politica(com_booleano)
 
+    # Recorte 3: quem a politica recusa vira Recusado (0)
+    previsto_sistema = previsto.copy()
+    previsto_sistema[~faixa.to_numpy()] = 0
+
     return {
         "todos": _calcular_metricas(alvo_teste, previsto),
         "faixa_intermediaria": _calcular_metricas(
             alvo_teste[faixa], previsto[faixa.to_numpy()]
         ),
+        "sistema_completo": _calcular_metricas(alvo_teste, previsto_sistema),
     }
 
 
@@ -417,8 +426,9 @@ if __name__ == "__main__":
         sys.exit()  # para aqui: nao treina nem imprime o resto
 
     resultado = treinar_modelo()
-    nomes = {"todos": "Todos os perfis do teste",
-             "faixa_intermediaria": "So a faixa intermediaria (politica nao recusa)"}
+    nomes = {"todos": "Todos os perfis do teste (so o modelo)",
+             "faixa_intermediaria": "So a faixa intermediaria (politica nao recusa)",
+             "sistema_completo": "SISTEMA COMPLETO (politica + modelo)"}
     for chave, titulo in nomes.items():
         m = resultado[chave]
         print(f"\n== {titulo} ({m['n']} perfis) ==")
