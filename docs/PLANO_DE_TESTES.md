@@ -185,5 +185,5 @@ Rodada 1: de 26 a 27/11 (registrar problemas e corrigir os de gravidade Alta). R
 
 | Rodada | Período | Executado por | Casos OK | Casos que falharam | Problemas abertos |
 | --- | --- | --- | --- | --- | --- |
-| 1 | 26 a 27/11 | | | | |
+| 1 | 24/11 (adiantada) | A | Casos de prioridade Alta da parte da A + 2 scripts | nenhum | 0 |
 | 2 | 27 a 28/11 | | | | |
