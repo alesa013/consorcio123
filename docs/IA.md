@@ -23,6 +23,7 @@ A completar.
 
 - 10.000 perfis sintéticos, gerados com semente fixa (mesmos perfis em qualquer máquina).
 - Separação: 80% treino e 20% teste (2.000 perfis de teste).
+- Ruído de 5% nos rótulos (500 de 10.000 invertidos), para simular decisões imperfeitas.
 
 ## 5. Métricas
 
@@ -37,7 +38,7 @@ Matriz do sistema completo: [[996, 74], [83, 847]].
 
 ## 6. Limitações
 
-- No sistema completo, 43 perfis rotulados como aprovados nos dados sintéticos são recusados pela política. Por isso a revocação do sistema (91,1%) é menor que a do modelo na faixa intermediária (95,5%). A política é regra de negócio e prevalece sobre o rótulo.
+-- No sistema completo, 43 perfis rotulados como aprovados nos dados sintéticos são recusados pela política. A causa é o ruído de 5% aplicado aos rótulos na geração dos dados (500 de 10.000 rótulos invertidos de propósito): alguns perfis que a política recusa ficaram com rótulo "Aprovado". Por isso a revocação do sistema (91,1%) é menor que a do modelo na faixa intermediária (95,5%). A política é regra de negócio e prevalece sobre o rótulo.
 - Os dados são sintéticos; os números não representam clientes reais.
 
 ## 7. Decisões do modelo

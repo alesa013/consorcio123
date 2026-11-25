@@ -52,7 +52,7 @@ Ordem dos campos: renda / vínculo / meses de vínculo / dívidas / restrição 
 
 | ID | Pri. | O que testar | Passos | Resultado esperado | Situação |
 | --- | --- | --- | --- | --- | --- |
-| CT-01 | A | Instalação limpa | Em uma pasta nova (de preferência em outro computador), seguir o `README.md`: clonar, criar o ambiente, instalar e rodar | O sistema abre sem erro; a primeira execução cria `consorcio.db` e `modelo_v3_2.joblib` | |
+| CT-01 | A | Instalação limpa | Em uma pasta nova (de preferência em outro computador), seguir o `README.md`: clonar, criar o ambiente, instalar e rodar | O sistema abre sem erro; a primeira execução cria `consorcio.db` e `modelo_v3_2.joblib` | OK |
 | CT-02 | M | Modo sem login | Deixar `LOGIN_ATIVO = False` e rodar | Entra como "Usuário de demonstração" (`demo@local`) | |
 | CT-03 | A | Login Microsoft | Clicar em **Entrar com Microsoft** | Mostra nome e e-mail na barra lateral | |
 | CT-04 | A | Logout | Clicar em **Sair** | Volta à tela de entrada; sem login, o formulário não aparece | |
@@ -84,9 +84,9 @@ Ordem dos campos: renda / vínculo / meses de vínculo / dívidas / restrição 
 | CT-20 | A | Fatores individuais | Avaliar P1; depois mudar só a entrada para 0 | As listas de fatores são **diferentes**, em português simples | |
 | CT-21 | A | A política vem antes do modelo | Avaliar qualquer perfil com restrição Sim | A origem é sempre **Política**, nunca Modelo | |
 | CT-22 | M | Probabilidade válida | Avaliar P1 a P7 | Probabilidade sempre entre 0% e 100% | |
-| CT-23 | A | Métricas do modelo | Rodar `python modelo.py` | Roda sem erro; faixa intermediária com acurácia de 90,3% | |
+| CT-23 | A | Métricas do modelo | Rodar `python modelo.py` | Roda sem erro; faixa intermediária com acurácia de 90,3% | OK |
 | CT-24 | M | Reprodutibilidade | A e B rodam `python modelo.py` | As duas obtêm as mesmas métricas | |
-| CT-25 | M | Scripts de teste | Rodar `teste_banco.py`, `teste_recomendador.py`, `teste_dados_sinteticos.py` e `teste_decidir.py` | Todos terminam sem erro | |
+| CT-25 | M | Scripts de teste | Rodar `teste_banco.py`, `teste_recomendador.py`, `teste_dados_sinteticos.py` e `teste_decidir.py` | Todos terminam sem erro | OK |
 
 ### 6.4 Resultado
 
@@ -125,10 +125,10 @@ Ordem dos campos: renda / vínculo / meses de vínculo / dívidas / restrição 
 
 | ID | Pri. | O que testar | Passos | Resultado esperado | Situação |
 | --- | --- | --- | --- | --- | --- |
-| CT-44 | A | Números corretos | Rodar `python -c "import banco; print(banco.resumo_dashboard())"` e comparar com a página | Os valores são iguais | |
-| CT-45 | M | Atualização | Avaliar um novo perfil e clicar em **Atualizar números** | O total de perfis sobe | |
-| CT-46 | M | Banco vazio | Com o banco sem perfis | Mensagem informando que não há avaliações | |
-| CT-47 | A | Privacidade | Olhar a página inteira | Nenhum e-mail nem dado individual aparece | |
+| CT-44 | A | Números corretos | Rodar `python -c "import banco; print(banco.resumo_dashboard())"` e comparar com a página | Os valores são iguais | OK |
+| CT-45 | M | Atualização | Avaliar um novo perfil e clicar em **Atualizar números** | O total de perfis sobe | OK |
+| CT-46 | M | Banco vazio | Com o banco sem perfis | Mensagem informando que não há avaliações | Alessandra - 24/11/2026 |
+| CT-47 | A | Privacidade | Olhar a página inteira | Nenhum e-mail nem dado individual aparece | OK |
 
 ### 6.8 Minha conta
 
@@ -142,11 +142,11 @@ Ordem dos campos: renda / vínculo / meses de vínculo / dívidas / restrição 
 
 | ID | Pri. | O que testar | Passos | Resultado esperado | Situação |
 | --- | --- | --- | --- | --- | --- |
-| CT-51 | M | Persistência | Salvar um perfil, parar o sistema e rodar de novo | O perfil continua salvo | |
-| CT-52 | M | Banco recriado | Parar o sistema, apagar `consorcio.db` e rodar de novo | O banco é recriado com o catálogo | |
-| CT-53 | A | Segredos fora do GitHub | Rodar `git ls-files .streamlit` | Lista **somente** `.streamlit/secrets.toml.example` | |
-| CT-54 | A | Repositório privado | Abrir o endereço do repositório em uma janela anônima do navegador | A página não carrega (erro 404) | |
-| CT-55 | A | Avisos na tela | Observar o topo de todas as páginas | Aparecem o aviso de dados fictícios e o de e-mail registrado | |
+| CT-51 | M | Persistência | Salvar um perfil, parar o sistema e rodar de novo | O perfil continua salvo | OK |
+| CT-52 | M | Banco recriado | Parar o sistema, apagar `consorcio.db` e rodar de novo | O banco é recriado com o catálogo | OK |
+| CT-53 | A | Segredos fora do GitHub | Rodar `git ls-files .streamlit` | Lista **somente** `.streamlit/secrets.toml.example` | OK |
+| CT-54 | A | Repositório privado | Abrir o endereço do repositório em uma janela anônima do navegador | A página não carrega (erro 404) | OK |
+| CT-55 | A | Avisos na tela | Observar o topo de todas as páginas | Aparecem o aviso de dados fictícios e o de e-mail registrado | OK |
 
 ## 7. Divisão da execução
 
