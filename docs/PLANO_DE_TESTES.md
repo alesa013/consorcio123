@@ -85,7 +85,7 @@ Ordem dos campos: renda / vínculo / meses de vínculo / dívidas / restrição 
 | CT-21 | A | A política vem antes do modelo | Avaliar qualquer perfil com restrição Sim | A origem é sempre **Política**, nunca Modelo | |
 | CT-22 | M | Probabilidade válida | Avaliar P1 a P7 | Probabilidade sempre entre 0% e 100% | |
 | CT-23 | A | Métricas do modelo | Rodar `python modelo.py` | Roda sem erro; faixa intermediária com acurácia de 90,3% | OK |
-| CT-24 | M | Reprodutibilidade | A e B rodam `python modelo.py` | As duas obtêm as mesmas métricas | |
+| CT-24 | M | Reprodutibilidade | A e B rodam `python modelo.py` | As duas obtêm as mesmas métricas | Parcial: verificado só na máquina da B (pasta principal e clone limpo); falta rodar na máquina da A |
 | CT-25 | M | Scripts de teste | Rodar `teste_banco.py`, `teste_recomendador.py`, `teste_dados_sinteticos.py` e `teste_decidir.py` | Todos terminam sem erro | OK |
 
 ### 6.4 Resultado

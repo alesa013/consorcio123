@@ -15,6 +15,7 @@ Gravidade: Alta (impede o uso ou a demonstração), Média (atrapalha), Baixa (e
 | --- | --- | --- | --- | --- |
 | 1 | 22/11 | Ordenar as barras do Acompanhamento na mesma ordem da tabela | A | Aberta |
 | 2 | 24/11 | Fazer decidir() e a métrica usarem uma única função para a regra da política | Alessandra | Aberta |
+| 3 | 26/11 | Rodar o CT-24 na máquina da A (Python 3.14.10) e comparar as métricas com as da B (Python 3.13) | B | Aberta |
 
 ---
 
